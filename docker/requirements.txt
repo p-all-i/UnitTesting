@@ -1,0 +1,14 @@
+ultralytics==8.1.28
+python-dotenv==1.0.0
+opencv-python==4.8.0.76
+redis==5.0.1
+jsonschema
+pika
+Pillow==10.2.0
+imagezmq==1.1.1
+#-e .
+
+pytest
+
+pycryptodome
+pycryptodomex

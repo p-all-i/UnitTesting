@@ -1,0 +1,44 @@
+version: "3.7"
+
+services:
+  assembly:
+    env_file:
+      - .env
+    environment:
+      - MVCAM_SDK_PATH=/opt/MVS
+      - MVCAM_COMMON_RUNENV=/opt/MVS/lib
+      - LD_LIBRARY_PATH=/opt/MVS/lib/64:/opt/MVS/lib/32:$LD_LIBRARY_PATH
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - belts="f970e84e-0ac5-43f2-963b-6ee446910d9e"
+        - DEBIAN_FRONTEND=noninteractive
+        # - aws_key_id
+        # - aws_key_secret
+        - GITHUB_TOKEN= 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
+
+    image: "iut-assembly:latest"
+    network_mode: "host"
+    container_name: ut-transmitter
+    privileged: true
+    restart: on-failure
+    volumes:
+      - /home/frinksserver/pallavi/assembly/unit_testing/vip-assembly-python/scripts:/ut-transmitter/scripts
+      - /home/frinksserver/pallavi/assembly/unit_testing/vip-assembly-python/docker_vols/model_logs:/ut-transmitter/model_logs
+      - /home/frinksserver/pallavi/assembly/unit_testing/vip-assembly-python/docker_vols/models_weight:/ut-transmitter/models_weight
+      - /home/frinksserver/pallavi/assembly/unit_testing/vip-assembly-python/docker_vols/saved_results:/ut-transmitter/saved_results
+      - /etc/timezone:/etc/timezone
+      - /etc/localtime:/etc/localtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    working_dir: /ut-transmitter/scripts
+    # command: python3 main.py
+    command: pytest tests/ -v
+    # command: sh -c "python3 main.py & pytest tests/ -v"

@@ -1,0 +1,57 @@
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+
+# ARG aws_key_id 
+# ARG aws_key_secret 
+
+RUN apt-get update && apt-get -y install libgl1 libglib2.0-0 python3 >/dev/null 2>&1
+RUN apt-get install -y python3-pip git wget curl ffmpeg libsm6 libxext6 gcc unzip g++ apt-utils >/dev/null 2>&1
+RUN apt-get install lsb-release curl gpg -y >/dev/null 2>&1
+RUN apt-get install redis -y >/dev/null 2>&1
+
+
+FROM restreamio/gstreamer:2022-12-12T14-46-07Z-prod-dbg as gstreamer
+# Copy GStreamer setup from the previous stage
+COPY --from=gstreamer /usr/local /usr/local
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    gstreamer1.0-tools \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    gstreamer1.0-doc \
+    gstreamer1.0-tools \
+    gstreamer1.0-x \
+    gstreamer1.0-alsa \
+    gstreamer1.0-pulseaudio
+
+
+
+
+
+# Ensure PYTHONPATH includes the site-packages directory
+ENV PYTHONPATH=/opt/conda/lib/python3.10/site-packages:$PYTHONPATH
+
+
+# RUN pip3 install awscli --upgrade
+# RUN aws --version
+COPY mvs-drivers.deb mvs-drivers.deb
+RUN dpkg -i mvs-drivers.deb
+WORKDIR ..
+
+RUN mkdir /python
+
+# RUN AWS_ACCESS_KEY_ID=$aws_key_id AWS_SECRET_ACCESS_KEY=$aws_key_secret AWS_DEFAULT_REGION=ap-south-1 aws s3 cp --recursive s3://frinks-builds/assembly-offline/python/ python
+
+WORKDIR /python
+
+
+# RUN python -m pip install 'git+https://github.com/facebookresearch/detectron2.git' >/dev/null 2>&1
+RUN python -m pip install "git+https://x-access-token:${GITHUB_TOKEN}@github.com/Frinks-ai/detectron2"
+
+COPY ./requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+# RUN pip install --upgrade pip setuptools wheel
+
+# RUN pip install dist/*.whl
