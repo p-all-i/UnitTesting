@@ -38,13 +38,13 @@ class TestModelManager(unittest.TestCase):
 
     @patch('assembly.models.ModelManager.FasterRCNN')
     @patch('assembly.models.ModelManager.YoloV8')
-    # @patch('assembly.models.ModelManager.PointRend')
+    @patch('assembly.models.ModelManager.PointRend')
     @patch('assembly.models.ModelManager.os.path.exists', return_value=True)
     @patch('assembly.models.ModelManager.open', new_callable=mock_open, read_data=b'\x00' * 16)
 
 
     
-    def test_load_models_with_different_types(self, mock_open_file, mock_path_exists, MockYoloV8, MockFasterRCNN ):#, MockPointRend):
+    def test_load_models_with_different_types(self, mock_open_file, mock_path_exists, MockYoloV8, MockFasterRCNN, MockPointRend): # ):#, 
         # Mocking active models list from the actual config
         active_models = list(self.model_params.keys())
         print("my activat model whould be---->", active_models)
@@ -52,7 +52,7 @@ class TestModelManager(unittest.TestCase):
         # Create mock instances of models
         mock_faster_rcnn_instance = MockFasterRCNN.return_value
         mock_yolov8_instance = MockYoloV8.return_value
-        # mock_pointrend_instance = MockPointRend.return_value
+        mock_pointrend_instance = MockPointRend.return_value
         
         # Create a mock model_dict to compare against
         expected_model_dict = {'8ef7af83-c241-4a11-9553-52d31403c49e': "<assembly.models.detection.Pointrend.PointRend object at 0x7f394a41ceb0>", '36eceb6e-7176-41de-b424-220b05afe4d2': "<assembly.models.detection.Pointrend.PointRend object at 0x7f394a41cee0>", '767e8e64-9128-4c79-bacd-24ed298e9817': "<assembly.models.detection.Pointrend.PointRend object at 0x7f394a40c7c0>"}
