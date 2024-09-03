@@ -39,9 +39,9 @@ class HardwareTriggerTransmitter:
 
     def featurepathload(self):
         if self.transmitter_config["feature_path"]:
-            one = os.getenv("MODEL_WEIGHTS_DIR")
-            two = os.path.join(one, "transmitterfeature")
-            featureFilePath = os.path.join(two,self.transmitter_config["feature_path"])
+            one = os.getenv("CAMERA_CONFIGS_DIR")
+            # two = os.path.join(one, "transmitterfeature")
+            featureFilePath = os.path.join(one,self.transmitter_config["feature_path"])
             self.logger.info(f"what is the feature path {featureFilePath} {os.path.exists(featureFilePath)}")
             if len(featureFilePath) > 0:
                 ret = self.cam.MV_CC_FeatureLoad(featureFilePath)

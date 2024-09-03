@@ -144,6 +144,6 @@ class Interface:
 
 
 
-
+        print(f"want to chack what is happening to the res dict cropping{res_dict}")
         return res_dict, object_count
         

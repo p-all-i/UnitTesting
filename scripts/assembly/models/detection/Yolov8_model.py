@@ -38,8 +38,9 @@ class YoloV8:
         self.model = self.load_model() # Loading the yolo model
         print(f"\n\n\n ----------------------inside yolov8 custom class model.names: {self.model.names}\n\n\n")
         
-
-        self.to(device)
+        if model_weights.endswith('.pt'):
+            self.to(device)
+        # self.to(device)
         self.warm_up()
 
 
@@ -51,7 +52,7 @@ class YoloV8:
         Returns:
             object: The loaded YOLOv8 model.
         """
-        return YOLO(self.model_weights) 
+        return YOLO(self.model_weights, task='detect') 
 
     # Method to preprocess the image -- *nothing to to here
     def preProcess(self, image):
@@ -145,4 +146,3 @@ class YoloV8:
             input = self.preProcess(image=dummy_image)
             self.forward(input=input)
         print("Model warm-up completed.")
-

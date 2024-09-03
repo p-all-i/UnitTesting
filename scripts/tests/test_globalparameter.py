@@ -1,3 +1,4 @@
+
 import unittest
 from unittest.mock import Mock
 from assembly.model_utils.initialize import  GlobalParameters, getConfigData
@@ -42,13 +43,27 @@ class TestGlobalParameters(unittest.TestCase):
     def test_load_trackers(self):
         self.gp.loadTrackers()
         
-        # Check if trackersInfo is present in the config data
-        if 'trackersInfo' in self.config_data and len(self.config_data['trackersInfo']) > 0:
-            # If trackersInfo exists, assert that TrackerDict is populated
+        # Check if cameraInfo is present and contains tracker data
+        camera_info = self.config_data.get('cameraInfo', {})
+        
+        # Initialize a flag to check if any camera has tracker data
+        has_tracker_info = False
+        
+        # Iterate over camera information to find tracker data
+        for camera_id, camera_data in camera_info.items():
+            for camera_entry in camera_data:
+                if 'tracker' in camera_entry and camera_entry['tracker']:
+                    has_tracker_info = True
+                    break
+            if has_tracker_info:
+                break
+        
+        # Check TrackerDict based on the presence of tracker info
+        if has_tracker_info:
+            # If any camera has tracker info, TrackerDict should be populated
             self.assertGreater(len(self.gp.TrackerDict), 0)
         else:
-            # If trackersInfo does not exist, TrackerDict should be empty
+            # If no camera has tracker info, TrackerDict should be empty
             self.assertEqual(len(self.gp.TrackerDict), 0)
-
 if __name__ == "__main__":
     unittest.main()

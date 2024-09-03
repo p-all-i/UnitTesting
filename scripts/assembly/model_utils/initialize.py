@@ -10,7 +10,7 @@ from assembly.input_validation.schema import cameraInfo_schema
 from assembly.input_validation.validation import validateInput
 
 
-load_dotenv()  
+load_dotenv()
 
 # Class that store all the necessary infomration from models to inference pipelines
 class GlobalParameters():
@@ -45,6 +45,7 @@ class GlobalParameters():
         self.active_models = None
         # Data about each of the belts(inference pipelines)
         self.cameraParams = CONFIG_DATA.get("cameraInfo", {})
+        self.transmitterParams = CONFIG_DATA.get("transmitterInfo", {})
         # meta data about the trackers
         self.tracker_params = CONFIG_DATA.get("trackersInfo", [])
         
@@ -124,6 +125,10 @@ class GlobalParameters():
         for cameraId in cameraParams.keys():
             self.cameraParams[cameraId] = cameraParams[cameraId]
 
+    def updateTransmitterParams(self, transmitterParams):
+        for transmitterID in transmitterParams.keys():
+            self.transmitterParams[transmitterID] = transmitterParams[transmitterID]
+
     # Method to extract active models 
     def extract_values(self, key="model_id"):
         """Recursively pull values of specified key from nested JSON."""
@@ -163,7 +168,7 @@ class GlobalParameters():
                     #     active_trackers[cameraID].append(trackerinfo)
                     # else:
                     active_trackers[cameraID] = trackerinfo
-        print("why no tracker 1? " , active_trackers)
+        # print("why no tracker 1? " , active_trackers)                                                                                                
         return active_trackers
     
     # Function to remove the loaded trackers
@@ -270,6 +275,7 @@ class getConfigData:
 
         for model in CONFIG_JSON.get("modelsInfo", []):
             class_file_path = model["params"].get("classes")
+            loggerObj.logger.error(f"what is the path in the config {class_file_path}")
             
             # if class_file_path and os.path.exists(class_file_path):
             uuids = self.read_uuids_from_file(class_file_path)
@@ -300,9 +306,11 @@ def DumpModels(GP, active_models):
 # Funtion that takes in the GP and varient change INFO
 # Makes the necessary changes
 def updateVariants(GP, CONFIG_JSON, loggerObj):
-    cameraJson = CONFIG_JSON
+    # cameraJson = CONFIG_JSON
+    cameraInfo = CONFIG_JSON["cameraInfo"]
+    transmitterInfo = CONFIG_JSON["transmitterInfo"]
     # Validating the cameraInfo reached
-    status, reason= validateInput.validate(schema=cameraInfo_schema, json=cameraJson)
+    status, reason= validateInput.validate(schema=cameraInfo_schema, json=cameraInfo)
     if status:
         print(f"[INFO] {datetime.datetime.now()} Varient change input validation Successfull")
         loggerObj.logger.info(f"Varient change input validation Done")
@@ -314,7 +322,8 @@ def updateVariants(GP, CONFIG_JSON, loggerObj):
         loggerObj.logger.info(f"[ERROR] {datetime.datetime.now()} Resaon: {reason}")
         Exception("Varient change input validation Failed!!!") 
 
-    GP.updatecamerParams(cameraParams=cameraJson)
+    GP.updatecamerParams(cameraParams=cameraInfo)
+    GP.updateTransmitterParams(transmitterParams=transmitterInfo)
     print(f"[INFO] {datetime.datetime.now()} Updated CameraParams in GP")
     loggerObj.logger.info(f"Updated CameraParams in GP")
     # Getting current active models

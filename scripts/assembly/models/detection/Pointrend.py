@@ -34,14 +34,17 @@ class PointRend:
         print("inside PointRend ")
         # Preparing config
         self.cfg = self.editCfg(model_weights=model_weights, config_path=config_path, classes=classes)
-        # Loading model
+        #... Loading model
         self.model = self.load_model()
+
+        print(f"check the type od model {type(self.model)}")
         # Putting model to GPU
         self.to(device)
         self.classes = classes
         # Loading Aug function
         self.aug = ResizeShortestEdge([self.cfg.INPUT.MIN_SIZE_TEST, self.cfg.INPUT.MIN_SIZE_TEST], self.cfg.INPUT.MAX_SIZE_TEST)
         self.warm_up()
+
     # Function to load the cfg file and make changes to it 
     # Depending on the params passed to it
     def editCfg(self, model_weights, config_path, classes):

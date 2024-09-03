@@ -109,15 +109,15 @@ class OutputPrep:
                 final_res[i] = self.prep_roi(res_obj=roi_result, GT=GT, final_res=final_res[i])
 
 
-                send_path = os.getenv("SAVE_DIR")
-                post_image = os.getenv("POST_IMAGE")
+        send_path = os.getenv("SAVE_DIR")
+        post_image = os.getenv("POST_IMAGE")
 
 
-                posting = True
-                if post_image == "1":
-                    posting = True
-                if post_image == "0":
-                    posting = False
+        posting = True
+        if post_image == "1":
+            posting = True
+        if post_image == "0":
+            posting = False
 
 
         main_res = {"tracker":res["tracker"],"isPathUsed": posting , "result":final_res, "cameraId": res["cameraId"],"configId": res["configId"], "groupId": res["groupId"], "iterator":  res["iterator"], "groupLimit":res["groupLimit"], "extraInfo": res["extraInfo"]}

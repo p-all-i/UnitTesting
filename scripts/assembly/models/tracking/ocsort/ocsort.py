@@ -192,7 +192,7 @@ class OCSort(object):
         self.trackers = []
         self.frame_count = 0
         self.det_thresh = det_thresh
-        self.direction = movement_direction
+        self.movement_direction = movement_direction
         self.ROI = ROI
         self.delta_t = delta_t
         self.asso_func = ASSO_FUNCS[asso_func]
@@ -206,7 +206,7 @@ class OCSort(object):
         self.BBox = OrderedDict()
         
 
-    def update(self, boxes, confs, classes):
+    def update(self, dets, confs, classes):
         """
         Params:
           dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
@@ -220,7 +220,7 @@ class OCSort(object):
         if dets is not None and len(dets):
             # print(f'hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-----------')
             # print(f'dets[4]------------ {dets[:,4 ]}')
-            xyxys = boxes
+            xyxys = dets
             confs = confs
             clss = classes
 

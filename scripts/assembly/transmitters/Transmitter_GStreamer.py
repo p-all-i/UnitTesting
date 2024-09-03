@@ -18,34 +18,24 @@ import subprocess as sp
 
 
 class GstreamerTransmitter:
-    def __init__(self, shared_queue, camera_ip, transmitter_config):
+    def __init__(self, shared_queue, camera_ip, transmitter_config,transmitter_id,logger):
         self.queue = shared_queue
         self.camera_ip =  "192.168.10.20"
         self.transmitter_config = transmitter_config
         self.gstreamer_exe = 'gst-launch-1.0'
         self.username = "admin"
         self.password = "Frinks%402020"
-        self.video_path = f"rtspt://{self.username}:{self.password}@{camera_ip}:554/Streaming/Channels/101?transportmode=unicast"
-        # self.video_path = f"rtspt://admin:Frinks%402020@192.168.10.20:554/Streaming/Channels/101?transportmode=unicast"
+        # self.video_path = f"rtspt://{self.username}:{self.password}@{camera_ip}:554/Streaming/Channels/101?transportmode=unicast"
+        self.video_path = "rtspt://admin:Frinks%402020@192.168.10.20:554/Streaming/Channels/101?transportmode=unicast"
         self.height = 1080
         self.width = 1920
         self.gstreamer_source = 'rtspsrc'
         self.gstreamer_latency = 'latency=0'
         self.g_bExit = False
-        # self.logger = self.setup_logging()
+        self.logger = logger
         self.processHandle = None
         self.frame_count = 0
 
-    # def setup_logging(self):
-    #     logger = logging.getLogger(__name__)
-    #     logger.setLevel(logging.DEBUG)
-    #     logger.propagate = False
-    #     formatter = logging.Formatter('%(asctime)s [%(levelname)8s:%(name)1s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    #     os.makedirs("./camera_logs/", exist_ok=True)
-    #     handler = logging.handlers.RotatingFileHandler("./camera_logs/camera.log", maxBytes=10000000, backupCount=5)
-    #     handler.setFormatter(formatter)
-    #     logger.addHandler(handler)
-    #     return logger
 
     def start_gstreamer(self):
         print("start gstreamer")
@@ -64,7 +54,7 @@ class GstreamerTransmitter:
             "frame_count": self.frame_count,  # Add the frame counter to frame_info
         }
         self.queue.put(frame_info)
-        # self.logger.info("Captured Frame")
+        self.logger.info("Captured Frame")
 
 
         save_in = os.getenv("SAVE_DIR")
@@ -72,21 +62,22 @@ class GstreamerTransmitter:
         print("images saved")
         cv2.imwrite(filename, image)
 
-    def run(self):
+    def run(self, stop_event):
         print("1")
+        self.logger.info("came to run now")
         self.processHandle = self.start_gstreamer()
         # time_between_restarts = 5  # Seconds to sleep between sender restarts
-        print("end gs streamer")
+        self.logger.info("end gs streamer")
 
-        while not self.g_bExit:
-            print("gbexit false")
+        while not stop_event.is_set():
+            
             try:
-                print("here")
+                self.logger.info("here")
                 raw_image = self.processHandle.stdout.read(self.width * self.height * 3)
-                print("going to leth condition", raw_image)
+                self.logger.info("going to leth condition", raw_image)
                 if len(raw_image) < self.width * self.height * 3:
-                    # self.logger.error(f"Frame capture failed----{self.camera_ip}")
-                    print("is lenth short")
+                    self.logger.error(f"Frame capture failed----{self.camera_ip}")
+                    self.logger.info("is lenth short")
                     self.processHandle.terminate()
                     self.processHandle.stdout.close()
                     self.processHandle = self.start_gstreamer()
@@ -98,7 +89,7 @@ class GstreamerTransmitter:
                 self.processHandle.stdout.close()
                 self.processHandle.terminate()
                 self.processHandle.wait()
-                # self.logger.info("\nEXITING...")
+                self.logger.info("\nEXITING...")
                 break
 
     def stop(self):

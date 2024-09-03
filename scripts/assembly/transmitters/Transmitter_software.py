@@ -14,13 +14,27 @@ from assembly.MVcameracontrolclasscode.MvCameraControl_class import *
 import multiprocessing as mp
 import redis
 import json
-
+from queue import Queue
 class SoftwareTriggerTransmitter:
-    def __init__(self, shared_queue, camera_ip, transmitter_config, transmitter_id, transmitterlog):
+    def __init__(self, shared_queue, camera_ip, transmitter_config, transmitter_id, transmitterlog, stop_event):
+
+        # self.redis_queue = mp.Queue()
+
+        self.pubsub = None
+        self.redis_client = None
+    
+
+
         self.queue = shared_queue
         self.camera_ip = camera_ip
+        self.transmitter_id = transmitter_id
         self.transmitter_config = transmitter_config
         self.cam = None
+        self.logger = transmitterlog
+        self.redis_queue = mp.Queue()
+        self.stop_event = stop_event
+        
+        self.init_redis(self.transmitter_id)
         self.g_bExit = False
         self.deviceList = MV_CC_DEVICE_INFO_LIST()
         self.tlayerType = MV_GIGE_DEVICE | MV_USB_DEVICE
@@ -31,18 +45,22 @@ class SoftwareTriggerTransmitter:
         self.processHandle = None
         self.isProcessCreated = False
         self.featureFilePath_inConfig = True
-        self.redis_queue = mp.Queue()
-        self.redis_client = None
+        
+        
+
+
+
         self.frame_count = 0
-        self.transmitter_id = transmitter_id
+        
         print("Transmitter Id::", transmitter_id)
-        self.init_redis(self.transmitter_id)
+        
+        self.run(self.stop_event)
     
     def featurepathload(self):
         if self.transmitter_config["feature_path"]:
-            one = os.getenv("MODEL_WEIGHTS_DIR")
-            two = os.path.join(one, "transmitterfeature")
-            featureFilePath = os.path.join(two,self.transmitter_config["feature_path"])
+            one = os.getenv("CAMERA_CONFIGS_DIR")
+            # two = os.path.join(one, "transmitterfeature")
+            featureFilePath = os.path.join(one,self.transmitter_config["feature_path"])
             self.logger.info(f"what is the path {featureFilePath}")
             if len(featureFilePath) > 0:
                 ret = self.cam.MV_CC_FeatureLoad(featureFilePath)
@@ -202,7 +220,7 @@ class SoftwareTriggerTransmitter:
         key_specific_methods = {
             'Height': self.cam.MV_CC_SetIntValue,
             'Width': self.cam.MV_CC_SetIntValue,
-            'Gamma': self.cam.MV_CC_SetFloatValue,
+            # 'Gamma': self.cam.MV_CC_SetFloatValue,
             'ExposureTime': self.cam.MV_CC_SetFloatValue,
             'Gain': self.cam.MV_CC_SetFloatValue,
             'TriggerMode': self.cam.MV_CC_SetEnumValue,
@@ -226,47 +244,91 @@ class SoftwareTriggerTransmitter:
 
     def init_redis(self, transmitter_id):
         # Initialize Redis client for communication
-        self.redis_client = redis.StrictRedis(host=os.getenv('REDIS_ENDPOINT'), port=os.getenv('REDIS_PORT'))
+        self.redis_client = redis.StrictRedis(host=os.getenv('REDIS_ENDPOINT'), port=os.getenv('REDIS_PORT')) # to publish the message to the channel
+        
         self.redis_subscriber_thread = threading.Thread(target=self.redis_subscribe)
         self.logger.info(f"{self.redis_subscriber_thread}")
         self.redis_subscriber_thread.start()
 
+# '''
+#         # Start the queue length checker thread
+#         self.queue_length_thread = threading.Thread(target=self.check_queue_length)
+#         self.logger.info(f"Starting queue length checker thread: {self.queue_length_thread}")
+#         self.queue_length_thread.start()
+#         '''
+
     def redis_subscribe(self):
         # Subscribe to Redis channel for software trigger messages
-        pubsub = self.redis_client.pubsub()
-        pubsub.subscribe(self.transmitter_id)   #("transmitter") #("360482ad-a06c-46de-bcef-08936c96e2c9")
-        for message in pubsub.listen():
-            if not isinstance(message['data'], int):
-                self.logger.info(f"what message {message['data']}")
-                self.redis_queue.put(message['data'].decode('utf-8'))        
+        self.pubsub = self.redis_client.pubsub()
+        self.pubsub.subscribe(self.transmitter_id)   #("transmitter") #("360482ad-a06c-46de-bcef-08936c96e2c9")
+        t = time.time()
 
-    def update_config(self):
-        if not self.redis_queue.empty():
-            message = self.redis_queue.get()
-            self.logger.info(f"Processing message: {message}")
-            ret = self.cam.MV_CC_StopGrabbing()
-            if ret != 0:
-                self.logger.info("Stop grabbing fail! ret[0x%x]" % ret)
-                return False
+        for message in self.pubsub.listen():
+
+            if message['type'] == "message":
+                data = message['data'].decode('utf-8')
+                if data == "Stop_Redis_Thread":
+                    self.logger.info(f"Got message to stop {data}")
+                    self.redis_subscriber_thread.join()
+                    self.pubsub.unsubscribe(self.transmitter_id)
+                    self.redis_client.close()
+
+
+            if not isinstance(message['data'], int):
+                # self.logger.info(f"what message {message['data']} and getting it from ---------- {self.transmitter_id}")
+                self.redis_queue.put(message['data'].decode('utf-8'))
+
+                if time.time() - t > 5 :
+                    self.logger.info(f"queue size{self.redis_queue.qsize()}")
+                    t = time.time()
+                
+                if not self.redis_queue.empty():
+                    self.logger.info(f"Redis queue :: {self.redis_queue} {message['data'].decode('utf-8')} for {self.transmitter_id} ")
+
+    def check_queue_length(self):
+        while True:
+            queue_length = self.redis_queue.qsize()
+            current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            self.logger.info(f"[{current_time}] Current redis_queue length: {queue_length}")
+            time.sleep(3)
+
+
+    def update_config(self, message):
+        # self.logger.info("Checking for new messages in redis_queue")
+        # if not self.redis_queue.empty():
+            # message = self.redis_queue.get()
+        self.logger.info(f"Processing message: for {self.transmitter_id} ---------and the message is -------> {message}")
+        ret = self.cam.MV_CC_StopGrabbing()
+        if ret != 0:
+            self.logger.info("Stop grabbing fail! ret[0x%x]" % ret)
+            return False
+        if isinstance(message, dict):
+            currCapture = message
+        else:
             currCapture = json.loads(message)
-            cameraConfig = currCapture["config"]
-            self.configId = currCapture["config"]["configId"]
-            self.configure(cameraConfig)
-            # self.configure_camera_settings(cameraConfig)
-            ret = self.cam.MV_CC_StartGrabbing()
-            if ret != 0:
-                self.logger.info("Start grabbing fail! ret[0x%x]" % ret)
-                return False
-            return True
-        return False
+        cameraConfig = currCapture["config"]
+        self.configId = currCapture["config"]["configId"]
+        self.configure(cameraConfig)
+        # self.configure_camera_settings(cameraConfig)
+        ret = self.cam.MV_CC_StartGrabbing()
+        if ret != 0:
+            self.logger.info("Start grabbing fail! ret[0x%x]" % ret)
+            return False
+        return True
+    # else:
+    #     self.logger.info("No new messages in redis_queue")  
+    #     return False
     
     def run(self, stop_event):
+        
         while True:
+            t = time.time()
             if not stop_event.is_set():
                 configure_flag = self.configure_camera()
                 if not configure_flag:
+                    self.logger.info(f"why false here {configure_flag}")
                     continue
-                print("Camera configuration completed")
+                self.logger.info(f"Camera configuration completed for {self.transmitter_id}")
                 self.pData = (c_ubyte * self.nPayloadSize)()
                 self.stFrameInfo = MV_FRAME_OUT_INFO_EX()
                 memset(byref(self.stFrameInfo), 0, sizeof(self.stFrameInfo))
@@ -274,29 +336,92 @@ class SoftwareTriggerTransmitter:
                 if ret != 0:
                     self.logger.info("Start grabbing failed! ret[0x%x]" % ret)
                     continue
+                self.logger.info(f"The redis queue here {self.redis_queue}")
+                if self.redis_queue.empty():
+                    self.logger.info(f"redis is empty after configuration ")
+
                 while not stop_event.is_set():
+                    # self.logger.info(f"The redis queue here {self.redis_queue}")
                     if not self.redis_queue.empty():
-                        self.update_config()
+                        message = self.redis_queue.get()
+                        Update_status = self.update_config(message)
+                        if Update_status == False:
+                            self.logger.info("Setting Config Fail in update, Loosing last trigger")
+                            break
                         ret=self.cam.MV_CC_SetCommandValue("TriggerSoftware")
                         if ret!=0:
-                            self.logger.info("command value error[0x%x]" % ret)
-                        ret = self.cam.MV_CC_GetOneFrameTimeout(byref(self.pData), self.nPayloadSize, self.stFrameInfo, 1000)
+                            self.logger.info("Loosing the last trigger ---> command value error[0x%x]" % ret)
+                            break
+                        ret = self.cam.MV_CC_GetOneFrameTimeout(byref(self.pData), self.nPayloadSize, self.stFrameInfo, 20000)
                         if ret != 0:
-                            self.logger.info(f"failed to capture {ret}")
+                            self.logger.info(f"Loosing the last trigger --->failed to capture {ret} ")
+                            break
                         if ret == 0:
                             self.process_frame(self.configId)
-                        else:
-                            self.logger.info("No_data[0x%x]" % ret)
-                            time.sleep(0.1)
+                            x = time.time() - t
+
+                            self.logger.info(f"what is time after capture ")
+                        
+                    # else:
+                    #     break
             else:
                 break
         self.stop()
     def stop(self):
         """Stop the transmitter and release resources."""
+        t = time.time()
         if self.cam:
             self.cam.MV_CC_StopGrabbing()
-            self.logger.info("stoppimg the Grabbing")
+            x = time.time() - t 
+            self.logger.info(f"stoppimg the Grabbing , and time taken --> {x}")
             self.cam.MV_CC_CloseDevice()
-            self.logger.info("CloseDevice")
+            x = time.time() - t 
+            self.logger.info(f"CloseDevice, and time taken --> {x}")
             self.cam.MV_CC_DestroyHandle()
-            self.logger.info("DestroyHandle")
+            x = time.time() - t 
+            self.logger.info(f"DestroyHandle, and time taken --> {x}")
+        x = time.time() - t 
+        self.logger.info(f"Total stopping time taken --> {x}")
+
+        self.pubsub = self.redis_client.publish(self.transmitter_id, message = "Stop_Redis_Thread" )
+
+
+
+
+
+
+
+
+
+
+        # self.stop_event_redis.set()
+        # self.redis_subscriber_thread.join()
+
+
+        # # Optional: Clean up Redis client if needed
+        # self.redis_client.close()
+        # self.logger.info("Transmitter stopped and resources released.")
+
+
+
+            
+
+
+
+#  File "/python-transmitter/scripts/assembly/transmitters/Transmitter_software.py", line 280, in redis_subscribe
+#     self.redis_subscriber_thread.join()
+#   File "/opt/conda/lib/python3.10/threading.py", line 1093, in join
+#     raise RuntimeError("cannot join current thread")
+# RuntimeError: cannot join current thread
+# Transmitter Id:: 04c952fc-953d-4edb-9088-08f3782bf4bc
+# completed once
+# Exception in thread Thread-5 (redis_subscribe):
+# Traceback (most recent call last):
+#   File "/opt/conda/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+#     self.run()
+#   File "/opt/conda/lib/python3.10/threading.py", line 953, in run
+#     self._target(*self._args, **self._kwargs)
+#   File "/python-transmitter/scripts/assembly/transmitters/Transmitter_software.py", line 280, in redis_subscribe
+#     self.redis_subscriber_thread.join()
+#   File "/opt/conda/lib/python3.10/threading.py", line 1093, in join
+#     raise RuntimeError("cannot join current thread")

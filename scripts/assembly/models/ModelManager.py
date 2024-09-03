@@ -39,7 +39,6 @@ class modelManager:
         self.loggerObj.logger.info("[INFO] ModelManager started")
         self.model_key = os.environ.get("MODEL_KEY")
         self.config_key = os.environ.get("MODEL_KEY")
-        print("model_params:::::" , self.model_params)
 
 
 
@@ -235,36 +234,5 @@ class modelManager:
                 self.loggerObj.logger.exception("[INFO] Tried loading a model that is not implementing")
                 print(f"[INFO] {datetime.datetime.now()} Tried loading a model that is not implementing")
                 raise Exception("[INFO] Model not implemented")
-            
-        print("what is model dict", model_dict)
         return model_dict
-    
-
-
-    def WC_forUT(self):
-
-        for uuid, params in self.model_params.items():
-            model_type = params["model_properties"]["type"]
-            model_key = params["model_properties"]["modelKey"]
-
-            weights_key = os.path.join(self.MODELS_DIR, params["model_path"])
-            config_key = os.path.join(self.MODELS_DIR, params["model_properties"]["config"])
-            weights_key = b"\x06C3\x13x[D\x12\xd3I\x1b\xed\x089\x04\x02G\xf3\x92\x8e\xfb\x1a5g\x8f\x95\x16\xe3$/\x1c\xe5"
-            config_key = b"\x06C3\x13x[D\x12\xd3I\x1b\xed\x089\x04\x02G\xf3\x92\x8e\xfb\x1a5g\x8f\x95\x16\xe3$/\x1c\xe5"
-            model_weights = self.decryption_model(model_weights, weights_key)
-            config_path = self.decryption_config(config_path, config_key)
-            classes = params["model_properties"]["params"]["classes"]
-            
-            return model_weights, config_path, classes
-
-        raise ValueError("No model parameters found.")
-
-
-
-
-
-
-
-
-    
 

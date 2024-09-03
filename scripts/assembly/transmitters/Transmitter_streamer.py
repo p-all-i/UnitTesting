@@ -5,7 +5,7 @@ import threading
 import time
 import uuid
 from ctypes import *
-import numpy as np
+import numpy as np 
 import cv2
 from dotenv import load_dotenv
 from assembly.MVcameracontrolclasscode.MvCameraControl_class import *
@@ -15,7 +15,11 @@ import json
 from multiprocessing import Manager
 
 class ContinuousStreamingTransmitter:
-    def __init__(self, shared_queue, camera_ip, transmitter_config, transmitter_id, transmitterlog):
+    def __init__(self, shared_queue, camera_ip, transmitter_config, transmitter_id, transmitterlog,stop_event):
+        
+        self.pubsub = None
+        self.redis_client = None
+        
         self.logger = transmitterlog
         self.queue = shared_queue
         self.camera_ip = camera_ip
@@ -36,12 +40,16 @@ class ContinuousStreamingTransmitter:
         self.transmitter_id = transmitter_id
         self.configId = None
         self.init_redis()
+        self.stop_event = stop_event 
+
+
+        self.run(self.stop_event)
 
     def featurepathload(self):
         if self.transmitter_config["feature_path"]:
-            one = os.getenv("MODEL_WEIGHTS_DIR")
-            two = os.path.join(one, "transmitterfeature")
-            featureFilePath = os.path.join(two,self.transmitter_config["feature_path"])
+            one = os.getenv("CAMERA_CONFIGS_DIR")
+            # two = os.path.join(one, "transmitterfeature")
+            featureFilePath = os.path.join(one,self.transmitter_config["feature_path"])
             
             if len(featureFilePath) > 0:
                 ret = self.cam.MV_CC_FeatureLoad(featureFilePath)    
@@ -139,7 +147,9 @@ class ContinuousStreamingTransmitter:
                     configure_flag = False
                     return configure_flag       
 
-                elif self.transmitter_config["streaming_config"] != "null":
+                elif self.transmitter_config["streaming_config"] != None:
+                    hh = self.transmitter_config["streaming_config"]
+                    print(f"why it is not null {hh}")
                     config = self.transmitter_config["streaming_config"]["properties"]
                     self.configure(config)
 
@@ -215,6 +225,18 @@ class ContinuousStreamingTransmitter:
         pubsub = self.redis_client.pubsub()
         pubsub.subscribe(self.transmitter_id)
         for message in pubsub.listen():
+
+
+
+            if message['type'] == "message":
+                data = message['data'].decode('utf-8')
+                if data == "Stop_Redis_Thread":
+                    self.logger.info(f"Got message to stop {data}")
+                    self.redis_subscriber_thread.join()
+                    self.pubsub.unsubscribe(self.transmitter_id)
+                    self.redis_client.close()
+
+
             if not isinstance(message['data'], int):
                 self.redis_queue.put(message['data'].decode('utf-8'))
                 self.mess = True
@@ -293,3 +315,5 @@ class ContinuousStreamingTransmitter:
             self.logger.info("CloseDevice")
             self.cam.MV_CC_DestroyHandle()
             self.logger.info("DestroyHandle")
+
+        self.pubsub = self.redis_client.publish(self.transmitter_id, message = "Stop_Redis_Thread" )

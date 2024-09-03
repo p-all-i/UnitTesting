@@ -33,6 +33,7 @@ class InterfaceCreation:
         ModelDict = GP.ModelDict
         TrackerDict = GP.TrackerDict
         cameraParams = GP.cameraParams
+        print(f"camera param is {cameraParams}")
         # Initialize an ordered dictionary to store the Interface objects
         GP.interfaceObjs = OrderedDict()
 

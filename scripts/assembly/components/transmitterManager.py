@@ -1,9 +1,9 @@
 import multiprocessing
-from ..interfaces.transmitterInterface import TransmitterInterface
+from assembly.interfaces.transmitterInterface import TransmitterInterface
 import logging
 import os
-
-
+from queue import Queue
+import time
 class TransmitterManager:
     def __init__(self, config, transmitterlog):
         self.config = config  # Configuration for transmitters
@@ -11,10 +11,13 @@ class TransmitterManager:
         self.interfaces = {}  # Dictionary to keep track of transmitter interfaces and stop events
         self.shared_queue = multiprocessing.Queue()  # Shared queue for inter-process communication
         self.logger = transmitterlog
+        
 
     def start_transmitters(self):
         """Start all transmitters based on the provided configuration."""
+        
         for transmitter_id, transmitter_config in self.config["transmitterInfo"].items():
+            t = time.time()
             stop_event = multiprocessing.Event()  # Create a stop event for each transmitter
             
             interface = TransmitterInterface(self.shared_queue, transmitter_config["camera_ip"], transmitter_config, stop_event, transmitter_id, self.logger)
@@ -24,6 +27,8 @@ class TransmitterManager:
             
             self.logger.info(f"Starting process for transmitter ID: {transmitter_id}")
             process.start()
+            x = time.time() - t
+            self.logger.info(f"time taken to start the process---> {x}")
 
     def run_transmitter(self, interface):
         """Run the transmitter interface."""
@@ -32,14 +37,35 @@ class TransmitterManager:
 
     def stop_transmitters(self):
         """Stop all running transmitters."""
+
         for transmitter_id, process in self.processes.items():
+            t = time.time()
+            self.logger.info(f"Reached stop transmitter in manager {transmitter_id}")
             if transmitter_id in self.interfaces:
-                print(f"Stopping transmitter for ID: {transmitter_id}")
-                self.interfaces[transmitter_id]["stop_event"].set()  # Signal the transmitter to stop
-                self.interfaces[transmitter_id]["interfaceTrans"].stop()
                 
+
+
+                self.logger.info(f"Stopping transmitter for ID: {transmitter_id}")
+                hh = time.time()
+                
+                self.interfaces[transmitter_id]["stop_event"].set()  # Signal the transmitter to stop
+                set_time = time.time() - hh
+                self.logger.info(f"Time taken to set event stop , {set_time}")
+                xx = time.time()
+                self.interfaces[transmitter_id]["interfaceTrans"].stop()
+                stop_time = time.time() - xx
+                self.logger.info(f"time taken stop {stop_time}")
+
+            a = time.time()  
             if process.is_alive():
+                self.logger.info(f"process is alive")
                 process.join()  # Ensure the process has terminated
+            b = time.time() - a
+            self.logger.info(f"time taken for process to join , {b}")
+
+
+            x = time.time() - t
+            self.logger.info(f"Time taken to stop: {x} for the tranmitter :: {transmitter_id}")
         
 
 

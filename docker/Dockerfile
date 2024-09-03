@@ -51,7 +51,7 @@ RUN python -m pip install "git+https://x-access-token:ghp_CHcGfeoGyB55nykD8dsnYg
 COPY ./requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
-
+RUN pip install coverage pytest-cov
 
 # # Run unit tests
 # CMD ["python", "-m", "unittest", "discover","-s","scripts/tests/", "-v"]
@@ -59,3 +59,7 @@ RUN pip install -r requirements.txt
 
 # Run tests using pytest
 CMD ["pytest", "scripts/tests/", "-v"]
+
+
+# # Run the tests with coverage when the container starts
+# CMD ["coverage", "run", "-m", "pytest", "--cov=.", "--cov-report=term", "--cov-report=html"]

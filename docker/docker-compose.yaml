@@ -31,6 +31,7 @@ services:
       - /home/frinksserver/pallavi/assembly/unit_testing/vip-assembly-python/docker_vols/saved_results:/ut-transmitter/saved_results
       - /etc/timezone:/etc/timezone
       - /etc/localtime:/etc/localtime
+      - /path/on/host/htmlcov:/ut-transmitter/htmlcov  # Mounting the htmlcov directory to persist coverage reports
     deploy:
       resources:
         reservations:
@@ -40,5 +41,7 @@ services:
               capabilities: [ gpu ]
     working_dir: /ut-transmitter/scripts
     # command: python3 main.py
-    command: pytest tests/ -v
+    # command: pytest tests/ -v
     # command: sh -c "python3 main.py & pytest tests/ -v"
+
+    command: ["coverage", "run", "-m", "pytest", "--cov=.", "--cov-report=term", "--cov-report=html"]

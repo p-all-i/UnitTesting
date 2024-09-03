@@ -8,7 +8,7 @@ from collections import OrderedDict
 
 # Main class that has the workflow        
 class MainProcessor:
-    def __init__(self, GP, loggerObj, analysisLogic, output_sender, outputprepObj, visualisor, save_dir, shared_queue, transmitter_manager):
+    def __init__(self, GP, loggerObj, analysisLogic, output_sender, outputprepObj, visualisor, save_dir, shared_queue, transmitter_manager, varientchangeServer):
         """
         Initialize the MainProcessor object.
 
@@ -28,6 +28,8 @@ class MainProcessor:
         # self.comm_server = comm_server
         os.makedirs(self.save_dir, exist_ok=True)
         self.transmitter_manager = transmitter_manager
+
+        self.varientchangeServer = varientchangeServer
 
         self.st_s = time.time()
 
@@ -90,7 +92,7 @@ class MainProcessor:
         # print(f"[INFO] {datetime.datetime.now()} Received data for Variant change")
         # self.loggerObj.logger.info(f"Received data for Variant change")
         self.varient_change = False
-        message = self.output_sender.read()
+        message = self.varientchangeServer.read()
         if message is not None: 
             print("coming here ")
             self.varient_change = True
@@ -115,6 +117,7 @@ class MainProcessor:
                 self.transmitter_manager.start_transmitters()
                 self.loggerObj.logger.info(f"Resuming Transmitter after varient change")
                 # self.setup_interfaces()  # Reset interfaces on variant change
+                
             except Exception as e:
                 self.varient_change = False
                 self.Varient_change_data = None
@@ -259,8 +262,11 @@ class MainProcessor:
                     main_result = self.outputprepObj.run(res=output_res, interfaceObj=self.GP.interfaceObjs[camera_id][int(input_data["iterator"])])
                     print(f"Time taken for output prep {time.time()-st2}, {time.time()}")
                     self.loggerObj.loop_logger.info(f"Time taken for output prep {time.time()-st2}, {time.time()}")
-                    timestamp = str(datetime.datetime.now()).split(".")[0].replace(" ", ",")
+                    # timestamp = str(datetime.datetime.now()).split(".")[0].replace(" ", ",")
+                    now = datetime.datetime.now()
 
+# Format the timestamp to include milliseconds
+                    timestamp = now.strftime('%Y-%m-%d,%H:%M:%S') + ':' + str(int(now.microsecond / 1000)).zfill(3)
                     main_result["timestamp"] = timestamp
 
 
@@ -310,7 +316,23 @@ class MainProcessor:
                         
                         json.dump(main_result_converted, outfile)
                     # Sending to backend
+
+
+                    # if main_result_converted.get('result'):
+                    #     # Write the output to a file
+                    #     with open("OUTPUT_latest.json", "w") as outfile:
+                    #         json.dump(main_result_converted, outfile)
+
+                    #     # Sending to backend
+                    #     self.output_sender.send(message=main_result_converted)
+                    #     self.loggerObj.loop_logger.info(f"what is the message that i am sending {main_result_converted}")
+                    # else:
+                    #     self.loggerObj.loop_logger.info("Result is empty, not sending the message")
+
+
+
                     self.output_sender.send(message=main_result_converted)
+                    self.loggerObj.loop_logger.info(f"what is the message that i am sending {main_result_converted}")
 
                     print(f"Time taken for RabbitMq pushing {time.time()-st5}, {time.time()}")
                     self.loggerObj.loop_logger.info(f"Time taken for RabbitMq pushing {time.time()-st5}, {time.time()}")

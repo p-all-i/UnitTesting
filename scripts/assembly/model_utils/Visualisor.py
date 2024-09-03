@@ -58,6 +58,15 @@ class VisualizeResults:
         Returns:
             np.array: The frame with the ROI drawn on it.
         """
+        height, width = frame.shape[:2]
+    
+        if isinstance(roi, float):
+            # Convert float roi to pixel coordinate
+            if direction in ["up2down", "down2up"]:
+                roi = int(roi * height)  # Scale by height for vertical line
+            else:
+                roi = int(roi * width)   # Scale by width for horizontal line
+
         if isinstance(roi, int):
             if direction in ["up2down", "down2up"]:
                 cv2.line(frame, (0, roi), (frame.shape[1], roi), (0, 255, 0), 2)
@@ -153,6 +162,7 @@ class VisualizeResults:
             image = self.print_object_count(image=image, count=object_count)
         
         if roi is not None and direction is not None:
+            print(f"what is roi here {roi}")
             image = self.draw_roi(image, roi, direction)
         
         image = self.resize_image(original_image=image)

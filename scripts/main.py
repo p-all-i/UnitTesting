@@ -2,22 +2,24 @@ import os, sys, requests, json, time
 import threading
 from dotenv import load_dotenv
 # Load environment variables from .env file
-# time.sleep(300000)
-
 load_dotenv("./.env")
+# time.sleep(300000)
 import datetime, logging, traceback, sys, torch, cv2
 from assembly.model_utils.initialize import  GlobalParameters, extractFrameVCO, select_device, DumpModels, getConfigData
 from assembly.model_utils.initiate_loggers import InitLoggers 
 from assembly.model_utils.Visualisor import VisualizeResults
-from assembly.components.FileVideoStream import NodeCommServer
+from assembly.components.FileVideoStream import NodeCommServer, varientchange_server
 from assembly.analysis.analysis_logic import AnalysisLogic
 from assembly.interfaces.InterfaceCreation import InterfaceCreation
 from assembly.input_validation.validation import validateInput
 from assembly.components.mainProcessor import MainProcessor
 from assembly.components.prepOutput import OutputPrep
-from assembly.components.varientChange import subscribe_varientchange
+
 from assembly.components.transmitterManager import TransmitterManager
 # from configupdate import ConfigUpdater
+import multiprocessing as mp
+
+
 
 
 # for multi threading
@@ -25,7 +27,6 @@ import multiprocessing
 # from transmitter import Transmitter 
 # Fix the random seed for reproducibility
 torch.manual_seed(0)
-
 # Select the device for running the models (typically CPU or GPU)
 device = select_device(device='')
 
@@ -37,8 +38,10 @@ QUEUE_PUBLISH = os.getenv("QUEUE_PUBLISH")
 url1 = os.getenv('initial_data_endpoint')
 
 dockerid = os.environ.get("DOCKER_ID")
-if dockerid is None:
-    dockerid = os.getenv("DOCKER_ID")
+
+# if dockerid is None:
+#     dockerid = os.getenv("DOCKER_ID")
+    
 
 
 url = f"{url1}?dockerId={dockerid}"
@@ -70,8 +73,9 @@ analysisLogic = AnalysisLogic(loggerObj=loggerObj) # Analysis logic
 # createOutputs = CreateOutputs() # Outputclass creates
 outputprepObj = OutputPrep()
 # Fetch the configuration data from the backend
-CONFIG_JSON = getConfigData().getData(loggerObj=loggerObj, url= url1)
+CONFIG_JSON = getConfigData().getData(loggerObj=loggerObj, url= url)
 #-------------------------------------------------------------------------------
+
 CONFIG_JSON = getConfigData().update_config_classes(CONFIG_JSON, loggerObj)
 
 print("config", CONFIG_JSON)
@@ -145,12 +149,14 @@ consuming_queue = os.getenv("CONSUME_QUEUE")
 thread_master = None  # Initialize thread_master outside try block
 transmitterlog = loggerObj.transmitter_logging()
 
-
+#
 try:
     # ImageQserver Starting
     output_sender = NodeCommServer(exchange_publish_name=GP.EXCHANGE_PUBLISH, publishing_queue=GP.QUEUE_PUBLISH, consuming_queue=consuming_queue, host=pika_host, loggerObj=loggerObj)
     output_sender.start()
-    
+
+    varientchangeServer = varientchange_server(exchange_publish_name= "update_config", publishing_queue = dockerid, consuming_queue= dockerid, host=pika_host, loggerObj=loggerObj)
+    varientchangeServer.start()
     # Initialize and start the transmitter manager
     transmitter_manager = TransmitterManager(CONFIG_JSON,transmitterlog)
     transmitter_manager.start_transmitters()
@@ -171,7 +177,7 @@ except Exception as e:
 
 
 # Main
-main_processor = MainProcessor(GP, loggerObj, analysisLogic, output_sender, outputprepObj, Visualisor, SAVE_DIR, shared_queue, transmitter_manager)
+main_processor = MainProcessor(GP, loggerObj, analysisLogic, output_sender, outputprepObj, Visualisor, SAVE_DIR, shared_queue, transmitter_manager,varientchangeServer)
 
 print(f"[INFO] {datetime.datetime.now()} Starting Main python script")
 main_processor.run()

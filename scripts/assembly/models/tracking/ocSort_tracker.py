@@ -22,7 +22,7 @@ class ocTracker:
     
 
     def run(self, dets, confs, classes):
-        tracker_res = self.tracker(boxes=dets, confs=confs, classes=classes)
+        tracker_res = self.tracker.update(dets=dets, confs=confs, classes=classes)
 
         res = self.process_output(tracker_output=tracker_res)
 
